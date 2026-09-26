@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Commissary Inventory System</title>
+<style>
+:root{
+  --bg:#f4f5f7;--card:#ffffff;--ink:#1f2430;--sub:#6b7280;--line:#e5e7eb;
+  --brand:#0f766e;--brand-d:#0b5b55;--ok:#16a34a;--warn:#d97706;--bad:#dc2626;
+  --lowbg:#fef3c7;--outbg:#fee2e2;--okbg:#dcfce7;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161a;--card:#1d2026;--ink:#e8e9ec;--sub:#9aa0aa;--line:#30343c;
+    --lowbg:#3a3212;--outbg:#3a1616;--okbg:#123822;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161a;--card:#1d2026;--ink:#e8e9ec;--sub:#9aa0aa;--line:#30343c;
+  --lowbg:#3a3212;--outbg:#3a1616;--okbg:#123822;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+body{padding:14px 14px 60px}
+h1{font-size:20px;margin:4px 0 2px}
+.sub{color:var(--sub);font-size:13px;margin-bottom:14px}
+nav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);padding:6px 0;z-index:5}
+nav button{background:var(--card);border:1px solid var(--line);color:var(--ink);padding:8px 12px;border-radius:8px;font-size:13px;cursor:pointer}
+nav button.active{background:var(--brand);border-color:var(--brand);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:640px){.grid4{grid-template-columns:repeat(2,1fr)}.grid2{grid-template-columns:1fr}}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.kpi .n{font-size:22px;font-weight:bold}
+.kpi .l{font-size:12px;color:var(--sub)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--sub);font-weight:600;font-size:12px;text-transform:uppercase}
+tbody tr:hover{background:rgba(127,127,127,.08)}
+.tblwrap{overflow-x:auto}
+input,select{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font-size:13px}
+label{font-size:12px;color:var(--sub);display:block;margin-bottom:3px}
+.field{margin-bottom:10px}
+button.btn{background:var(--brand);border:none;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer}
+button.btn.secondary{background:transparent;color:var(--brand);border:1px solid var(--brand)}
+button.btn.danger{background:var(--bad)}
+button.btn:hover{background:var(--brand-d)}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:bold}
+.pill.OK{background:var(--okbg);color:var(--ok)}
+.pill.LOW{background:var(--lowbg);color:var(--warn)}
+.pill.OUT{background:var(--outbg);color:var(--bad)}
+.rowline{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:8px;align-items:end;margin-bottom:8px}
+@media(max-width:640px){.rowline{grid-template-columns:1fr 1fr}}
+.tag{font-size:11px;color:var(--sub)}
+.search{margin-bottom:10px}
+h2{font-size:16px;margin:0 0 12px}
+.linetbl td,.linetbl th{padding:5px 6px}
+.receipt{max-width:520px;margin:0 auto;font-family:'Courier New',monospace;font-size:13px}
+.receipt h3{text-align:center;margin:2px 0}
+.receipt .center{text-align:center}
+.receipt table{font-size:12px}
+.actionbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+@media print{
+  nav,.no-print{display:none!important}
+  body{background:#fff;color:#000;padding:0}
+  .card{border:none;box-shadow:none;padding:0}
+}
+.empty{color:var(--sub);font-size:13px;padding:10px 0}
+</style>
+</head>
+<body>
+<h1>🧾 Commissary Inventory System</h1>
+<div class="sub">Standalone version of your Excel workflow — Dashboard, Stock In/Out, Price Updates, Delivery Receipts. Data is saved automatically in this browser.</div>
+
+<nav id="tabs"></nav>
+<div id="app"></div>
+
+<script>
+const LS_KEY='commissary_inv_v1';
+const RAW_ITEMS = [["Market","BELLY","Pork Belly 400g","pcs",20,163,16],["Bar Items","BISCOFFBISCUITS","Biscoff biscuits 250g","pc",5,170,20],["Bar Items","BISCOFFS","Biscoff Sauce","pcs",0,350,0],["Market","BREADCRUMBS","Bread Crumbs 1kg","pack",2,130,0.2],["Market","CHEESEKATSU","Cheese Katsu","pcs",20,92,0],["Market","CHERRYOLE","Cherry Ole","pcs",5,0,3],["Market","CHICKENKATSU","Chicken Katsu 50g","pcs",20,20,70],["Market","CHICKENWINGS","Chicken Wings 520g","pcs",20,116,-30],["Bar Items","COFFEEBEANS","Coffee Beans 1kg","kg",5,730,10],["Market","COMBITOPPINGS","Combi Toppings 120g","pcs",20,28,0],["Market","CRABSTICK","CrabStick","pack",5,45,14],["Bar Items","DAVINCIBLUEBERRYSY","DV Blueberry Syrup 750ml","pc",0,499,0],["Bar Items","DAVINCICARAMELSY","DV Caramel 750ml","pcs",3,470,4],["Bar Items","DAVINCICHOCOLATESAUCE","DV Chocolate Sauce","pcs",0,1010,0],["Bar Items","DAVINCIPEPPERMINTSY","DV Peppermint Syrup 750ml","pcs",0,499,4],["Bar Items","DOKINGBLUEBERRYJAM","Doking Blueberry Jam","pcs",5,310,9],["Bar Items","DOKINGMANGOJAM","Doking Mango Jam","pcs",5,310,7],["Bar Items","DOKINGSTRAWBERRYJAM","Doking Strawberry Jam","pcs",5,310,6],["Market","FISHCAKE","Fish Cake","pack",5,150,11],["Bar Items","FRESHMILK","Fresh Milk","pack",0,80,0],["Market","FRIES","Fries 1kg","pack",10,100,29.84],["Market","GAT","Gatorade","Liter",2,130,1],["Market","KROPECK","Kropeck","pack",5,180,10],["Bar Items","MALAYSIACREAMER","Malaysia Creamer 25kg","Sack",2,3400,0],["Market","MEDLEYSAUCE","Ribs Sauce 1tub 4.9L","kg",2,91,26.6],["Market","MOZZA","Mozzarella 4kg","kg",5,1600,0.3],["Market","NACHOSCHIPS","Nachos Chips 500G","pack",5,145,20],["Market","NACHOSMEAT","Nachos Meat","pcs",20,33,88],["Market","NUGGETS","Nuggets","pack",5,470,6.1],["Market","NUTELLA","Nutella","pcs",5,1765,1],["Bar Items","PCARAMELSAUCE","Pomona Caramel Sauce","pcs",3,710,10],["Bar Items","PCHOCOLATEPOWDER","Pomona Chocolate Powder 800g","pcs",3,545,31],["Bar Items","PCHOCOLATESAUCE","Pomona Chocolate Sauce","pcs",3,830,0],["Bar Items","PESTOSAUCE","Pesto Sauce","kg",3,335,3.4],["Bar Items","PGREENTEAPLUS","Pomona Green Tea Plus (Matcha Powder 500g)","pack",5,470,12],["Bar Items","PISTACHIOCREAM","Pistachio Cream","pcs",0,0,0],["Market","PLATTER","Platter","pcs",5,113,27],["Bar Items","PLEMONSY","Pomona Lemon SY 1000ml","pcs",5,520,3],["Market","PORKCHOP","Pork Chop 2pcs","Pack",20,63,36],["Bar Items","PYOGURTPOWDER","Pomona Yogurt Powder","pcs",5,510,8],["Market","RIBS","Pork Ribs","pcs",20,86,60],["Market","RICECAKE","Rice Cake","kg",2,150,0],["Market","SAUSAGE","Sausage","pack",5,135,37.8],["Market","SEAFOOD","Seafood Pack","pcs",20,64,74],["Market","SHRIMP","Shrimp","pack",5,0,5],["Bar Items","SOJUMELON","Soju Melon","pcs",5,0,0],["Market","SPICYCHICKEN","Spicy Chicken 260g","pcs",20,73,0],["Market","SPINACH","Spinach 500g","R.E",5,157,9],["Market","STRIPS","Chicken Strips","kg",1,210,-3.7],["Bar Items","THEBARGINPINK","The Bar Gin Pink","pcs",5,0,1],["Market","TOMATOPASTE","Tomato Paste","pack",2,0,4],["Bar Items","TSBLUEBERRYSY","TS Blueberry SY 750ml","pcs",3,220,10],["Bar Items","TSCOOKIEDOUGH","TS Cookie Dough SY","pcs",5,290,21],["Bar Items","TSKIWEEJAM","TS Kiwee Jam","pcs",5,310,0],["Bar Items","TSKIWISY","TS Kiwi SY 750ml","pcs",3,255,5],["Bar Items","TSLYCHEESY","TS Lychee 750ml","pcs",3,245,15],["Bar Items","TSMANGOSY","TS Mango SY 750ml","pcs",3,260,19],["Bar Items","TSSTRAWBERRYSY","TS Strawberry SY 750ml","pcs",3,265,0],["Bar Items","TSSUGARSY","TS Sugar SY 750ml","pcs",3,160,25],["Bar Items","TSUBEPOWDER","TS Ube Powder","pcs",5,300,3],["Market","TTEOKBOKISAUCE","Tteokboki sauce","kg",5,371,0],["Market","TTEOKBOKITOPPINGS","Tteokboki Topppings","pcs",0,35,-28],["Bar Items","VANILLASY","DV Vanilla SY 750ml","pcs",3,450,21],["Bar Items","YOGURTPOWDER","PF Yogurt Powder","pcs",3,300,23]];
+// [type, code, name, unit, min, price, stock]
+const RAW_ADDLOG = [["2026-08-25","CHICKENKATSU",136,"COMMISSARY",""],["2026-08-25","PORKCHOP",80,"COMMISSARY",""],["2026-08-25","BELLY",43,"COMMISSARY",""],["2026-08-25","CHICKENWINGS",54,"COMMISSARY",""],["2026-08-25","RIBS",200,"COMMISSARY",""],["2026-08-26","PESTOSAUCE",10.5,"COMMISSARY",""],["2026-08-27","RIBS",74,"COMMISSARY",""],["2026-08-27","CHEESEKATSU",44,"COMMISSARY",""],["2026-08-27","PLATTER",20,"COMMISSARY",""],["2026-08-27","PORKCHOP",80,"COMMISSARY",""],["2026-08-27","MEDLEYSAUCE",16.8,"COMMISSARY",""],["2026-08-28","RIBS",99,"COMMISSARY",""],["2026-08-28","BELLY",45,"COMMISSARY",""],["2026-08-28","PORKCHOP",80,"COMMISSARY",""],["2026-08-29","CHICKENKATSU",159,"COMMISSARY",""],["2026-08-29","PORKCHOP",80,"COMMISSARY",""],["2026-08-29","COMBITOPPINGS",36,"COMMISSARY",""],["2026-08-29","RIBS",159,"COMMISSARY",""],["2026-08-30","CHICKENWINGS",53,"COMMISSARY",""],["2026-08-30","PORKCHOP",80,"COMMISSARY",""],["2026-08-30","RIBS",113,"COMMISSARY",""],["2026-08-30","MEDLEYSAUCE",14.8,"COMMISSARY",""],["2026-08-31","PORKCHOP",80,"COMMISSARY",""],["2026-08-31","SPICYCHICKEN",25,"COMMISSARY",""],["2026-08-31","SPINACH",10,"COMMISSARY",""],["2026-08-31","RIBS",86,"COMMISSARY",""],["2026-08-31","PLATTER",20,"COMMISSARY",""],["2026-09-01","CHICKENWINGS",54,"COMMISSARY",""],["2026-09-01","PORKCHOP",80,"COMMISSARY",""],["2026-09-01","BELLY",48,"COMMISSARY",""],["2026-09-01","RIBS",84,"COMMISSARY",""],["2026-09-02","FRIES",40,"COMMISSARY",""],["2026-09-03","CHICKENKATSU",163,"COMMISSARY",""],["2026-09-03","PORKCHOP",80,"COMMISSARY",""],["2026-09-03","RIBS",53,"COMMISSARY",""],["2026-09-03","MEDLEYSAUCE",12.7,"COMMISSARY",""],["2026-09-03","PLATTER",60,"COMMISSARY",""],["2026-09-04","CHICKENWINGS",55,"COMMISSARY",""],["2026-09-04","PORKCHOP",80,"COMMISSARY",""],["2026-09-04","RIBS",106,"COMMISSARY",""],["2026-09-04","PLATTER",20,"COMMISSARY",""],["2026-09-05","CHICKENKATSU",115,"COMMISSARY",""],["2026-09-05","PLATTER",25,"COMMISSARY",""],["2026-09-05","BROWNSUGAR",19.2,"COMMISSARY",""],["2026-09-05","COFFEEBEANS",30,"COMMISSARY",""],["2026-09-05","DAVINCICHOCOLATESAUCE",6,"COMMISSARY",""],["2026-09-05","DAVINCIBLUEBERRYSY",6,"COMMISSARY",""],["2026-09-05","DAVINCIPEPPERMINTSY",4,"COMMISSARY",""],["2026-09-05","BISCOFFBISCUITS",30,"COMMISSARY",""],["2026-09-06","CHICKENWINGS",54,"COMMISSARY",""],["2026-09-06","PORKCHOP",80,"COMMISSARY",""],["2026-09-06","PESTOSAUCE",9.7,"COMMISSARY",""],["2026-09-06","RIBS",82,"COMMISSARY",""],["2026-09-06","MEDLEYSAUCE",12.5,"COMMISSARY",""],["2026-09-06","STRIPS",5.7,"COMMISSARY",""],["2026-09-07","CHICKENKATSU",152,"COMMISSARY",""],["2026-09-07","PORKCHOP",80,"COMMISSARY",""],["2026-09-07","BELLY",48,"COMMISSARY",""],["2026-09-07","RIBS",90,"COMMISSARY",""],["2026-09-07","FRIES",20,"COMMISSARY",""],["2026-09-08","RIBS",107,"",""],["2026-09-08","CHICKENWINGS",56,"",""],["2026-09-09","MEDLEYSAUCE",9.5,"COMMISSARY",""],["2026-09-10","PCHOCOLATESAUCE",18,"Pomona",""],["2026-09-10","PORKCHOP",160,"COMMISSARY",""],["2026-09-10","TTEOKBOKITOPPINGS",17,"COMMISSARY",""],["2026-09-10","PESTOSAUCE",4.7,"COMMISSARY",""],["2026-09-11","PESTOSAUCE",5.1,"COMMISSARY",""],["2026-09-11","SPINACH",8,"COMMISSARY",""],["2026-09-11","RIBS",167,"COMMISSARY",""],["2026-09-11","COMBITOPPINGS",58,"COMMISSARY",""],["2026-09-12","FRIES",20,"",""],["2026-09-12","SAUSAGE",20,"",""],["2026-09-12","CHICKENKATSU",207,"",""],["2026-09-12","PLATTER",20,"",""],["2026-09-12","TTEOKBOKITOPPINGS",20,"",""],["2026-09-13","COMBITOPPINGS",56,"",""],["2026-09-13","PORKCHOP",160,"",""],["2026-09-13","BELLY",47,"",""],["2026-09-13","RIBS",58,"",""],["2026-09-13","STRIPS",2.6,"",""],["2026-09-14","MEDLEYSAUCE",9.8,"",""],["2026-09-14","RIBS",56,"",""],["2026-09-14","PORKCHOP",80,"",""],["2026-09-15","MEDLEYSAUCE",10.4,"",""],["2026-09-15","TTEOKBOKITOPPINGS",22,"",""],["2026-09-15","BELLY",49,"",""],["2026-09-15","PORKCHOP",80,"",""],["2026-09-15","CHICKENWINGS",56,"",""],["2026-09-15","RIBS",88,"",""],["2026-09-15","CHICKENKATSU",82,"",""],["2026-09-16","Fries",20,"",""],["2026-09-16","Nuggets",6,"",""],["2026-09-16","Seafood",115,"",""],["2026-09-16","PLATTER",20,"",""],["2026-09-17","PLATTER",27,"",""],["2026-09-17","SAUSAGE",10,"",""],["2026-09-17","NUGGETS",3,"",""],["2026-09-17","CHICKENKATSU",141,"",""],["2026-09-17","RIBS",58,"",""],["2026-09-17","MEDLEYSAUCE",13,"",""],["2026-09-17","PLATTER",27,"",""],["2026-09-17","TTEOKBOKITOPPINGS",20,"",""],["2026-09-18","STRIPS",7,"",""],["2026-09-18","CHICKENKATSU",167,"",""],["2026-09-18","SPINACH",7,"",""],["2026-09-18","RIBS",56,"",""],["2026-09-18","MEDLEYSAUCE",10.7,"",""],["2026-09-19","SAUSAGE",10,"",""],["2026-09-19","NUGGETS",2,"",""],["2026-09-19","CHICKENKATSU",153,"",""],["2026-09-19","PORKCHOP",80,"",""],["2026-09-19","PESTOSAUCE",11.5,"",""],["2026-09-19","PLATTER",20,"",""],["2026-09-19","TTEOKBOKISAUCE",3.5,"ADJUSMENTS",""],["2026-09-19","STRIPS",3.4,"ADJUSTMENTS",""],["2026-09-20","RIBS",57,"",""],["2026-09-20","CHICKENWINGS",52,"",""],["2026-09-20","MEDLEYSAUCE",12.5,"",""],["2026-09-20","STRIPS",3.2,"ADJUSMENTS",""],["2026-09-21","PORKCHOP",80,"",""],["2026-09-21","BELLY",48,"",""],["2026-09-21","RIBS",59,"",""],["2026-09-21","PLATTER",25,"",""],["2026-09-21","SAUSAGE",10,"",""],["2026-09-21","NUGGETS",3,"",""],["2026-09-21","FRIES",30,"",""],["2026-09-22","CHICKENKATSU",150,"",""],["2026-09-22","PORKCHOP",80,"",""],["2026-09-22","BELLY",46,"",""],["2026-09-22","RIBS",123,"",""],["2026-09-23","NUGGETS",3,"",""],["2026-09-23","SAUSAGE",20,"",""],["2026-09-23","CHICKENKATSU",150,"",""],["2026-09-23","CHICKENWINGS",53,"",""],["2026-09-23","PORKCHOP",160,"",""],["2026-09-23","BELLY",46,"",""],["2026-09-23","RIBS",60,"",""],["2026-09-23","MEDLEYSAUCE",25,"",""],["2026-09-23","STRIPS",4,"ADJUSTMENTS",""],["2026-09-24","CHICKENKATSU",148,"",""],["2026-09-24","PESTOSAUCE",10.5,"",""],["2026-09-24","RIBS",120,"",""],["2026-09-24","TTEOKBOKISAUCE",3.5,"ADJUSTMENTS",""],["2026-09-24","BREADCRUMBS",3,"ADJUSTMENTS",""],["2026-09-24","COMBITOPPINGS",23,"ADJUSTMENTS",""],["2026-09-25","BELLY",46,"",""],["2026-09-25","SPINACH",11,"",""],["2026-09-25","RIBS",56,"",""],["2026-09-25","MEDLEYSAUCE",13,"",""],["2026-09-25","COMBITOPPINGS",23,"",""],["2026-09-25","PLATTER",20,"",""]];
+// [date, code, qty, supplier, remarks]
+const RAW_DELLOG = [["2026-08-25","COM-2026-0001","Clark","CHICKENKATSU",63,33,"Printed"],["2026-08-25","COM-2026-0001","","RIBS",20,167,""],["2026-08-25","COM-2026-0001","","COMBITOPPINGS",22,23,""],["2026-08-25","COM-2026-0001","","TTEOKBOKISAUCE",4,325,""],["2026-08-25","COM-2026-0001","","PESTOSAUCE",1.1,350,""],["2026-08-25","COM-2026-0001","","PORKCHOP",20,63,""],["2026-08-25","COM-2026-0001","","COFFEEBEANS",5,740,""],["2026-08-25","COM-2026-0001","","OIL",2,1583,""],["2026-08-25","COM-2026-0002","Angeles","FRIES",12,110,"Printed"],["2026-08-25","COM-2026-0002","","SPICYCHICKEN",13,86,""],["2026-08-25","COM-2026-0002","","PCHOCOLATESAUCE",4,750,""],["2026-08-25","COM-2026-0002","","SUGARSY",3,0,""],["2026-08-25","COM-2026-0002","","COFFEEBEANS",5,740,""],["2026-08-25","COM-2026-0002","","RIBS",30,167,""],["2026-08-25","COM-2026-0002","","PORKCHOP",20,63,""],["2026-08-25","COM-2026-0002","","CHICKENKATSU",72,33,""],["2026-08-25","COM-2026-0003","Clark","FRIES",10,110,"Printed"],["2026-08-26","COM-2026-0004","Day One Clark","RIBS",20,167,"Printed"],["2026-08-26","COM-2026-0004","","MEDLEYSAUCE",6,80,""],["2026-08-27","COM-2026-0005","Day One Angeles","MOZZA",2,1650,"Printed- Paid 08-27-26"],["2026-08-27","COM-2026-0006","Day One Olongapo","PORKCHOP",160,63,"Printed"],["2026-08-27","COM-2026-0006","","RIBS",180,167,""],["2026-08-27","COM-2026-0006","","MEDLEYSAUCE",17.4,80,""],["2026-08-27","COM-2026-0006","","COMBITOPPINGS",23,23,""],["2026-08-27","COM-2026-0006","","BREADCRUMBS",1,130,""],["2026-08-27","COM-2026-0006","","CHICKENWINGS",20,126,"Handwritten on official Reciept"],["2026-08-27","COM-2026-0007","Day One Angeles","MEDLEYSAUCE",5.6,80,"Printed- Paid 08-27-26"],["2026-08-27","COM-2026-0007","","SEAFOOD",20,103,""],["2026-08-27","COM-2026-0007","","CHICKENKATSU",72,33,""],["2026-08-27","COM-2026-0007","","PLATTER",20,129,""],["2026-08-27","COM-2026-0007","","GAT",1,130,""],["2026-08-27","COM-2026-0007","","RIBS",20,167,"Delivered Yesterday"],["2026-08-27","COM-2026-0008","Day One Clark","RIBS",14,167,"Printed"],["2026-08-27","COM-2026-0008","","PORKCHOP",20,63,""],["2026-08-27","COM-2026-0008","","FRIES",10,110,""],["2026-08-28","COM-2026-0009","Day One Angeles","CHEESEKATSU",15,92,"Printed"],["2026-08-28","COM-2026-0009","","CHICKENWINGS",22,126,""],["2026-08-28","COM-2026-0009","","PORKCHOP",20,63,""],["2026-08-29","COM-2026-0009-2","Day One Angeles","RIBS",39,167,"Printed"],["2026-08-29","COM-2026-0009-2","","FRIES",5,110,""],["2026-08-28","COM-2026-0010","Day One Clark","CHEESEKATSU",15,92,""],["2026-08-28","COM-2026-0010","","CHICKENWINGS",24,126,""],["2026-08-28","COM-2026-0010","","SPINACH",3,250,""],["2026-08-28","COM-2026-0010","","PESTOSAUCE",5.5,350,""],["2026-08-29","COM-2026-0011","Day One Angeles","RIBS",30,167,"Printed"],["2026-08-29","COM-2026-0011","","BREADCRUMBS",1,130,""],["2026-08-29","COM-2026-0011","","PORKCHOP",40,63,""],["2026-08-29","COM-2026-0011","","CHICKENKATSU",60,33,""],["2026-08-29","COM-2026-0011","","STRIPS",4,170,""],["2026-08-29","COM-2026-0011","","MOZZA",3,1650,""],["2026-08-29","COM-2026-0011","","COOKIEDOUGH",5,0,""],["2026-08-29","COM-2026-0011","","SPINACH",3,250,""],["2026-08-29","COM-2026-0012","Day One Clark","RIBS",40,167,"Printed"],["2026-08-29","COM-2026-0012","","PORKCHOP",40,63,""],["2026-08-29","COM-2026-0012","","CHICKENKATSU",57,33,""],["2026-08-29","COM-2026-0012","","PCHOCOLATESAUCE",3,750,""],["2026-08-30","COM-2026-0013","Day One Angeles","PESTOSAUCE",5.3,350,"Printed"],["2026-08-30","COM-2026-0013","","MEDLEYSAUCE",4.8,80,""],["2026-08-30","COM-2026-0013","","RIBS",40,167,""],["2026-08-31","COM-2026-0014","Day One Angeles","PLATTER",20,129,""],["2026-08-31","COM-2026-0015","Day One Clark","RIBS",40,167,""],["2026-08-31","COM-2026-0015","","PORKCHOP",20,63,""],["2026-08-31","COM-2026-0015","","CHICKENKATSU",79,33,""],["2026-08-31","COM-2026-0015","","FRIES",10,110,""],["2026-09-01","COM-2026-0016","Day One Olongapo","RIBS",0,167,""],["2026-09-01","COM-2026-0016","","PORKCHOP",0,63,""],["2026-09-01","COM-2026-0016","","BELLY",0,163,""],["2026-09-01","COM-2026-0016","","CHICKENWINGS",0,126,""],["2026-09-01","COM-2026-0016","","MOZZA",0,1650,""],["2026-09-01","COM-2026-0016","","CARAMELSY",0,800,""],["2026-09-01","COM-2026-0016","","STRIPS",0,210,""],["2026-09-01","COM-2026-0016","","CHICKENKATSU",0,33,""],["2026-09-01","COM-2026-0017","Day One Clark","BELLY",22,163,""],["2026-09-01","COM-2026-0017","","CHICKENKATSU",50,33,""],["2026-09-01","COM-2026-0017","","MEDLEYSAUCE",6,80,""],["2026-09-01","COM-2026-0017","","CHEESEKATSU",15,92,""],["2026-09-02","COM-2026-0018","Day One Clark","STRIPS",2,210,""],["2026-09-02","COM-2026-0018","","CHICKENWINGS",22,126,""],["2026-09-02","COM-2026-0018","","RIBS",40,167,""],["2026-09-02","COM-2026-0018","","PORKCHOP",40,63,""],["2026-09-02","COM-2026-0018","","PCHOCOLATESAUCE",1,750,""],["2026-09-02","COM-2026-0018","","PCARAMELSAUCE",2,710,""],["2026-09-03","COM-2026-0018","","FRIES",10,110,""],["2026-09-02","COM-2026-0019","Day One Angeles","PORKCHOP",20,63,""],["2026-09-02","COM-2026-0019","","STRIPS",5,210,""],["2026-09-02","COM-2026-0019","","CHICKENWINGS",20,126,""],["2026-09-02","COM-2026-0019","","RIBS",10,167,""],["2026-09-02","COM-2026-0019","","SEAFOOD",20,103,""],["2026-09-02","COM-2026-0019","","FRIES",10,110,""],["2026-09-02","COM-2026-0019","","DAVINCICARAMELSY",5,0,""],["2026-09-02","COM-2026-0019","","PCHOCOLATESAUCE",1,750,""],["2026-09-03","COM-2026-0020","Day One Clark","PLATTER",25,129,""],["2026-09-03","COM-2026-0020","","STRIPS",2.9,210,""],["2026-09-03","COM-2026-0020","","MEDLEYSAUCE",6,80,""],["2026-09-03","COM-2026-0020","","CARAMELDV",5,490,""],["2026-09-03","COM-2026-0021","Day One Angeles","MEDLEYSAUCE",6,80,""],["2026-09-03","COM-2026-0021","","PLATTER",35,129,""],["2026-09-03","COM-2026-0021","","RIBS",40,86,""],["2026-09-03","COM-2026-0021","","CHICKENWINGS",32,123,""],["2026-09-03","COM-2026-0021","","PORKCHOP",40,63,""],["2026-09-04","COM-2026-0022","Day One Angeles","PLATTER",20,113,""],["2026-09-04","COM-2026-0022","","RIBS",26,86,""],["2026-09-04","COM-2026-0022","","SPINACH",3,250,""],["2026-09-04","COM-2026-0023","Day One Olongapo","PORKCHOP",120,63,""],["2026-09-04","COM-2026-0023","","RIBS",87,86,""],["2026-09-04","COM-2026-0023","","BELLY",36,163,""],["2026-09-04","COM-2026-0023","","STRIPS",3,210,""],["2026-09-04","COM-2026-0023","","CHICKENKATSU",83,23,""],["2026-09-04","COM-2026-0023","","KROPECK",10,180,""],["2026-09-04","COM-2026-0023","","SPINACH",3,250,""],["2026-09-04","COM-2026-0023","","CHICKENWINGS",30,117,""],["2026-09-04","COM-2026-0023","","RICECAKE",2,150,""],["2026-09-04","COM-2026-0023","","FISHCAKE",3,150,""],["2026-09-04","COM-2026-0023","","STRAWBERRYSY",5,0,""],["2026-09-04","COM-2026-0016-R","Day One Olongapo COM-2026-0016","RIBS",203,86,"From September 1, 2026"],["2026-09-04","COM-2026-0016-R","","PORKCHOP",200,63,""],["2026-09-04","COM-2026-0016-R","","BELLY",33,163,""],["2026-09-04","COM-2026-0016-R","","CHICKENWINGS",32,117,""],["2026-09-04","COM-2026-0016-R","","MOZZA",4,1650,""],["2026-09-04","COM-2026-0016-R","","DAVINCICARAMELSY",6,0,""],["2026-09-04","COM-2026-0016-R","","STRIPS",4.6,210,""],["2026-09-04","COM-2026-0016-R","","CHICKENKATSU",160,23,""],["2026-09-05","COM-2026-0024","Day One Angeles","CHEESEKATSU",11,92,""],["2026-09-05","COM-2026-0024","","SEAFOOD",20,103,""],["2026-09-05","COM-2026-0024","","CHICKENKATSU",8,23,""],["2026-09-05","COM-2026-0024","","MEDLEYSAUCE",6.5,91,""],["2026-09-05","COM-2026-0025","Day One Clark","RIBS",20,86,""],["2026-09-05","COM-2026-0025","","PLATTER",25,113,""],["2026-09-05","COM-2026-0025","","PORKCHOP",20,63,""],["2026-09-05","COM-2026-0025","","BELLY",24,163,""],["2026-09-05","COM-2026-0025","","MOZZA",0.7,1650,""],["2026-09-05","COM-2026-0025","","BROWNSUGAR",5,100,""],["2026-09-05","COM-2026-0025","","VANILLASY",3,490,""],["2026-09-06","COM-2026-0026","Day One Clark","COFFEEBEANS",10,740,""],["2026-09-06","COM-2026-0026","","BISCOFFBISCUITS",10,190,""],["2026-09-06","COM-2026-0026","","DAVINCICHOCOLATESAUCE",2,1010,""],["2026-09-06","COM-2026-0027","Day One Clark","STRIPS",4.1,210,""],["2026-09-06","COM-2026-0027","","RIBS",40,86,""],["2026-09-06","COM-2026-0027","","PORKCHOP",4,63,""],["2026-09-06","COM-2026-0027","","SEAFOOD",20,103,""],["2026-09-06","COM-2026-0027","","CHICKENKATSU",60,23,""],["2026-09-06","COM-2026-0027","","GARLIC",0.5,150,""],["2026-09-06","COM-2026-0027","","MEDLEYSAUCE",6.2,91,""],["2026-09-06","COM-2026-0028","Day One Angeles","STRIPS",1.6,210,""],["2026-09-06","COM-2026-0028","","FRIES",10,110,""],["2026-09-06","COM-2026-0028","","DAVINCICHOCOLATESAUCE",3,1010,""],["2026-09-07","COM-2026-0029","Day one Angeles","PESTOSAUCE",2.5,350,""],["2026-09-07","COM-2026-0029","","RIBS",20,86,""],["2026-09-07","COM-2026-0030","Day One Angeles","PESTOSAUCE",2.2,350,""],["2026-09-07","COM-2026-0030","","SPINACH",2,157,""],["2026-09-07","COM-2026-0030","","BROWNSUGAR",5,100,""],["2026-09-07","COM-2026-0030","","PORKCHOP",30,63,""],["2026-09-07","COM-2026-0030","","RIBS",40,86,""],["2026-09-07","COM-2026-0030","","CHICKENWINGS",20,117,""],["2026-09-07","COM-2026-0030","","NACHOSMEAT",38,33,""],["2026-09-07","COM-2026-0030","","STRIPS",2.1,210,""],["2026-09-07","COM-2026-0031","Day One Clark","RIBS",42,86,""],["2026-09-07","COM-2026-0031","","PORKCHOP",30,63,""],["2026-09-07","COM-2026-0031","","CHICKENKATSU",55,23,""],["2026-09-07","COM-2026-0031","","CHICKENWINGS",21,117,""],["2026-09-08","COM-2026-0032","Day one Olongapo","RIBS",116,86,""],["2026-09-08","COM-2026-0032","","PORKCHOP",80,63,""],["2026-09-08","COM-2026-0032","","PESTOSAUCE",2.5,350,""],["2026-09-08","COM-2026-0032","","FRIES",20,110,""],["2026-09-08","COM-2026-0032","","BREADCRUMBS",10,130,""],["2026-09-08","COM-2026-0032","","SAUSAGE",10,150,""],["2026-09-08","COM-2026-0032","","NACHOSCHIPS",20,190,""],["2026-09-08","COM-2026-0032","","MEDLEYSAUCE",5,91,""],["2026-09-08","COM-2026-0033","Day one Clark","MALAYSIACREAMER",1,3400,""],["2026-09-08","COM-2026-0034","Day One Angeles","MALAYSIACREAMER",1,3400,""],["2026-09-10","COM-2026-0035","Day One Clark","TTEOKBOKITOPPINGS",17,25,""],["2026-09-10","COM-2026-0035","","SPINACH",2,157,""],["2026-09-10","COM-2026-0035","","SEAFOOD",20,100,""],["2026-09-10","COM-2026-0036","Day one Angeles","BELLY",18,163,""],["2026-09-10","COM-2026-0036","","PORKCHOP",20,63,""],["2026-09-10","COM-2026-0036","","SPINACH",2,157,""],["2026-09-10","COM-2026-0036","","DAVINCICHOCOLATESAUCE",1,1010,""],["2026-09-10","COM-2026-0036","","PGREENTEAPLUS",12,470,""],["2026-09-11","COM-2026-0037","Day One Olongapo","RIBS",116,86,""],["2026-09-11","COM-2026-0037","","SEAFOOD",28,100,""],["2026-09-11","COM-2026-0037","","CHICKENKATSU",153,23,""],["2026-09-11","COM-2026-0037","","CHICKENWINGS",34,116,""],["2026-09-11","COM-2026-0037","","PORKCHOP",100,63,""],["2026-09-11","COM-2026-0037","","BELLY",20,163,""],["2026-09-11","COM-2026-0037","","COMBITOPPINGS",36,28,""],["2026-09-11","COM-2026-0037","","TSBLUEBERRYSY",3,220,""],["2026-09-11","COM-2026-0037","","PCHOCOLATESAUCE",6,830,""],["2026-09-11","NO-FEE-0001","Day one Angeles","NUTELLA",1,1765,""],["2026-09-11","COM-2026-0038","Day One Clark","PESTOSAUCE",2.4,350,""],["2026-09-11","COM-2026-0038","","RIBS",40,86,""],["2026-09-11","COM-2026-0038","","BELLY",21,163,""],["2026-09-11","COM-2026-0038","","COMBITOPPINGS",19,28,""],["2026-09-12","COM-2026-0039","Day One Clark","PLATTER",20,113,""],["2026-09-12","COM-2026-0039","","COMBITOPPINGS",19,28,""],["2026-09-12","COM-2026-0039","","PORKCHOP",20,63,""],["2026-09-12","COM-2026-0039","","TTEOKBOKITOPPINGS",17,25,""],["2026-09-12","COM-2026-0039","","CHICKENWINGS",10,116,""],["2026-09-12","COM-2026-0039","","RIBS",20,86,""],["2026-09-12","COM-2026-0039","","MEDLEYSAUCE",5.5,91,""],["2026-09-12","RAW","RAW","FRIES",0.12,100,""],["2026-09-12","RAW","","SAUSAGE",0.4,150,""],["2026-09-12","COM-2026-0040","Day One Angeles","RIBS",40,86,""],["2026-09-12","COM-2026-0040","","MEDLEYSAUCE",4,91,""],["2026-09-12","COM-2026-0040","","TTEOKBOKITOPPINGS",20,25,""],["2026-09-12","COM-2026-0040","","BELLY",12,163,""],["2026-09-12","COM-2026-0040","","PORKCHOP",20,63,""],["2026-09-12","COM-2026-0040","","COMBITOPPINGS",20,28,""],["2026-09-12","COM-2026-0040","","CHICKENKATSU",72,23,""],["2026-09-13","COM-2026-0041","Day One Angeles","FRIES",10,100,""],["2026-09-13","COM-2026-0041","","PCHOCOLATESAUCE",6,830,""],["2026-09-13","COM-2026-0041","","DAVINCIBLUEBERRYSY",3,499,""],["2026-09-13","COM-2026-0041","","CHICKENWINGS",22,116,""],["2026-09-13","COM-2026-0041","","PORKCHOP",40,63,""],["2026-09-13","COM-2026-0041","","RIBS",40,86,""],["2026-09-13","COM-2026-0041","","MEDLEYSAUCE",4.1,91,""],["2026-09-13","COM-2026-0041","","COFFEEBEANS",10,730,""],["2026-09-13","COM-2026-0041","","COMBITOPPINGS",28,28,""],["2026-09-13","COM-2026-0041","","BELLY",20,163,""],["2026-09-13","COM-2026-0042","Day One Clark","PCHOCOLATESAUCE",6,830,""],["2026-09-13","COM-2026-0042","","COMBITOPPINGS",28,28,""],["2026-09-13","COM-2026-0042","","RIBS",27,86,""],["2026-09-13","COM-2026-0042","","PORKCHOP",20,63,""],["2026-09-13","COM-2026-0042","","STRIPS",2.6,210,""],["2026-09-13","COM-2026-0042","","CHICKENKATSU",100,23,""],["2026-09-13","COM-2026-0042","","SPINACH",3,157,""],["2026-09-14","COM-2026-0043","Day One olongapo","RIBS",100,86,""],["2026-09-14","COM-2026-0043","","PORKCHOP",100,63,""],["2026-09-14","COM-2026-0043","","CHICKENWINGS",34,116,""],["2026-09-14","COM-2026-0043","","PLEMONSY",1,520,""],["2026-09-14","COM-2026-0043","","BELLY",27,163,""],["2026-09-14","COM-2026-0043","","MEDLEYSAUCE",11,91,""],["2026-09-14","COM-2026-0043","","PESTOSAUCE",4.7,350,""],["2026-09-14","COM-2026-0043","","SPINACH",3,157,""],["2026-09-14","COM-2026-0044","Day One Clark","RIBS",7,86,""],["2026-09-14","COM-2026-0044","","PESTOSAUCE",2.7,350,""],["2026-09-14","COM-2026-0044","","MEDLEYSAUCE",4.8,91,""],["2026-09-14","COM-2026-0044","","PORKCHOP",40,63,""],["2026-09-15","COM-2026-0045","Day One Angeles","BELLY",20,163,""],["2026-09-15","COM-2026-0045","","MEDLEYSAUCE",5,91,""],["2026-09-15","COM-2026-0045","","PORKCHOP",20,63,""],["2026-09-15","COM-2026-0045","","SEAFOOD",26,100,""],["2026-09-15","COM-2026-0045","","TTEOKBOKITOPPINGS",22,25,""],["2026-09-15","COM-2026-0045","","CHICKENKATSU",80,23,""],["2026-09-15","COM-2026-0045","","TSSTRAWBERRYSY",3,265,""],["2026-09-15","COM-2026-0045","","DAVINCIBLUEBERRYSY",3,499,""],["2026-09-15","COM-2026-0046","Day One Clark","BELLY",20,163,""],["2026-09-15","COM-2026-0046","","CHICKENKATSU",107,23,""],["2026-09-15","COM-2026-0046","","PLATTER",20,113,""],["2026-09-15","COM-2026-0046","","MEDLEYSAUCE",5,91,""],["2026-09-15","COM-2026-0046","","SEAFOOD",20,100,""],["2026-09-15","COM-2026-0046","","PORKCHOP",40,63,""],["2026-09-15","COM-2026-0047","Day One Angeles","RIBS",20,86,""],["2026-09-16","COM-2026-0048","Day One Clark","CHICKENWINGS",23,116,""],["2026-09-16","COM-2026-0048","","RIBS",40,86,""],["2026-09-16","COM-2026-0049","Day One Angeles","FRIES",10,100,""],["2026-09-16","COM-2026-0049","","RIBS",20,86,""],["2026-09-16","COM-2026-0049","","NUGGETS",1,470,""],["2026-09-16","COM-2026-0049","","SAUSAGE",7,150,""],["2026-09-17","COM-2026-0050","Day One Angeles","PLATTER",27,113,""],["2026-09-17","COM-2026-0050","","TTEOKBOKITOPPINGS",20,25,""],["2026-09-17","COM-2026-0050","","RIBS",13,86,""],["2026-09-17","RAW","RAW","FRIES",3.24,100,""],["2026-09-17","RAW","RAW","NUGGETS",2.7,470,""],["2026-09-17","RAW","RAW","SAUSAGE",10.8,135,""],["2026-09-18","COM-2026-0051","Day One Olongapo","BREADCRUMBS",10,130,""],["2026-09-18","COM-2026-0051","","CHICKENWINGS",33,116,""],["2026-09-18","COM-2026-0051","","PORKCHOP",60,63,""],["2026-09-18","COM-2026-0051","","RIBS",58,86,""],["2026-09-18","COM-2026-0051","","BELLY",9,163,""],["2026-09-18","COM-2026-0051","","SPINACH",2,157,""],["2026-09-18","COM-2026-0051","","MEDLEYSAUCE",10.7,91,""],["2026-09-18","COM-2026-0051","","CHICKENKATSU",141,23,""],["2026-09-18","COM-2026-0052","Day one Angeles","STRIPS",6.8,210,""],["2026-09-19","COM-2026-0053","Day One Clark","MEDLEYSAUCE",6,91,""],["2026-09-19","COM-2026-0053","","CHICKENKATSU",70,20,""],["2026-09-19","COM-2026-0053","","RIBS",20,86,""],["2026-09-19","COM-2026-0054","Day One Angeles","MEDLEYSAUCE",5.4,91,""],["2026-09-19","COM-2026-0054","","PLATTER",20,113,""],["2026-09-19","COM-2026-0054","","RIBS",36,86,""],["2026-09-19","COM-2026-0054","","STRIPS",3.6,210,""],["2026-09-19","COM-2026-0054","","TSSTRAWBERRYSY",3,265,""],["2026-09-19","COM-2026-0054","","TTEOKBOKISAUCE",3.5,371,""],["2026-09-19","COM-2026-0055","Day One Angeles","CHICKENKATSU",97,20,""],["2026-09-19","USED","USED","FRIES",2.4,100,""],["2026-09-19","Transfer to RAW","USED","NUGGETS",8,470,""],["2026-09-19","USED","USED","SAUSAGE",8,135,""],["2026-09-20","COM-2026-0056","Day One Angeles","PESTOSAUCE",2.2,350,""],["2026-09-20","COM-2026-0056","","RIBS",20,86,""],["2026-09-20","COM-2026-0056","","PORKCHOP",40,63,""],["2026-09-20","COM-2026-0056","","STRIPS",3.2,210,""],["2026-09-20","COM-2026-0057","Day One Clark","CHICKENWINGS",21,116,""],["2026-09-20","COM-2026-0057","","PORKCHOP",40,63,""],["2026-09-20","COM-2026-0057","","CHICKENKATSU",70,20,""],["2026-09-20","COM-2026-0057","","PESTOSAUCE",3,350,""],["2026-09-20","COM-2026-0057","","RIBS",37,86,""],["2026-09-21","COM-2026-0058","Day One Angeles","RIBS",29,86,""],["2026-09-21","COM-2026-0058","","MEDLEYSAUCE",3.4,91,""],["2026-09-21","COM-2026-0058","","BELLY",20,163,""],["2026-09-21","COM-2026-0058","","FRIES",10,100,""],["2026-09-21","COM-2026-0058","","PORKCHOP",20,63,""],["2026-09-21","COM-2026-0058","","CHICKENKATSU",83,20,""],["2026-09-21","COM-2026-0058","","SPINACH",4,157,""],["2026-09-21","COM-2026-0058","","PLATTER",13,113,""],["2026-09-21","COM-2026-0058","","TSMANGOSY",5,260,""],["2026-09-21","COM-2026-0058","","DOKINGMANGOJAM",2,310,""],["2026-09-21","COM-2026-0059","Day one Clark","PORKCHOP",20,63,""],["2026-09-21","COM-2026-0059","","RIBS",30,86,""],["2026-09-21","COM-2026-0059","","PLATTER",12,113,""],["2026-09-21","COM-2026-0059","","BELLY",20,163,""],["2026-09-21","COM-2026-0059","","SEAFOOD",30,64,""],["2026-09-21","COM-2026-0059","","MEDLEYSAUCE",4.2,91,""],["2026-09-21","COM-2026-0059","","TSMANGOSY",5,260,""],["2026-09-21","COM-2026-0059","","DOKINGMANGOJAM",2,310,""],["2026-09-21","COM-2026-0059","","TSUBEPOWDER",2,300,""],["2026-09-21","USED","","FRIES",2.4,100,""],["2026-09-21","USED","","SAUSAGE",8,135,""],["2026-09-21","USED","","NUGGETS",2.2,470,""],["2026-09-22","COM-2026-0060","Day One Olongapo","BELLY",54,163,""],["2026-09-22","COM-2026-0060","","PORKCHOP",100,63,""],["2026-09-22","COM-2026-0060","","CHICKENWINGS",36,116,""],["2026-09-22","COM-2026-0060","","SEAFOOD",20,64,""],["2026-09-22","COM-2026-0060","","MEDLEYSAUCE",6,91,""],["2026-09-22","COM-2026-0060","","RIBS",63,86,""],["2026-09-22","COM-2026-0060","","STRIPS",4,210,""],["2026-09-22","COM-2026-0060","","TSSTRAWBERRYSY",1,265,""],["2026-09-22","COM-2026-0060","","TSMANGOSY",5,260,""],["2026-09-22","COM-2026-0060","","TSSUGARSY",5,160,""],["2026-09-22","COM-2026-0060","","TSLYCHEESY",5,245,""],["2026-09-22","COM-2026-0060","","TSBLUEBERRYSY",5,220,""],["2026-09-22","COM-2026-0060","","DOKINGMANGOJAM",2,310,""],["2026-09-22","COM-2026-0060","","DOKINGSTRAWBERRYJAM",2,310,""],["2026-09-22","COM-2026-0060","","PGREENTEAPLUS",7,470,""],["2026-09-22","COM-2026-0060","","TSUBEPOWDER",3,300,""],["2026-09-22","COM-2026-0060","","SOJUMELON",5,0,""],["2026-09-22","COM-2026-0060","","DOKINGBLUEBERRYJAM",2,310,""],["2026-09-22","COM-2026-0061","Day One Clark","SPINACH",3,157,""],["2026-09-22","COM-2026-0061","","SPICYCHICKEN",25,73,""],["2026-09-23","COM-2026-0062","Day One Clark","FRIES",10,100,""],["2026-09-23","USED","","BREADCRUMBS",2.4,130,""],["2026-09-24","COM-2026-0063","Day One Angeles","CHICKENKATSU",75,20,""],["2026-09-24","COM-2026-0063","","MEDLEYSAUCE",6,91,""],["2026-09-24","COM-2026-0063","","PORKCHOP",40,63,""],["2026-09-24","COM-2026-0063","","RIBS",40,86,""],["2026-09-24","COM-2026-0063","","BELLY",22,163,""],["2026-09-24","COM-2026-0063","","TSBLUEBERRYSY",3,220,""],["2026-09-24","COM-2026-0064","Day One Clark","BREADCRUMBS",10,130,""],["2026-09-24","COM-2026-0064","","TTEOKBOKISAUCE",3.5,371,""],["2026-09-24","COM-2026-0064","","MEDLEYSAUCE",5.5,91,""],["2026-09-24","COM-2026-0064","","PESTOSAUCE",3,335,""],["2026-09-24","COM-2026-0064","","COMBITOPPINGS",23,28,""],["2026-09-24","COM-2026-0064","","BELLY",24,163,""],["2026-09-24","COM-2026-0064","","RIBS",40,86,""],["2026-09-24","COM-2026-0064","","PORKCHOP",20,63,""],["2026-09-24","USED","","BREADCRUMBS",2.4,130,""],["2026-09-25","COM-2026-0065","Day One Olongapo","MEDLEYSAUCE",11,91,""],["2026-09-25","COM-2026-0065","","RIBS",100,86,""],["2026-09-25","COM-2026-0065","","PORKCHOP",100,63,""],["2026-09-25","COM-2026-0065","","CHICKENWINGS",32,116,""],["2026-09-25","COM-2026-0065","","COMBITOPPINGS",23,28,""],["2026-09-25","COM-2026-0065","","SEAFOOD",35,64,""],["2026-09-25","COM-2026-0065","","CHICKENKATSU",225,20,""],["2026-09-25","COM-2026-0065","","PESTOSAUCE",7,335,""],["2026-09-25","COM-2026-0065","","BELLY",30,163,""],["2026-09-25","COM-2026-0065","","SPINACH",3,157,""],["2026-09-25","COM-2026-0066","Day One Clark","CHICKENWINGS",21,116,""],["2026-09-25","COM-2026-0066","","PLATTER",20,113,""],["2026-09-25","COM-2026-0066","","PORKCHOP",20,63,""],["2026-09-25","COM-2026-0067","Day One Angeles","BELLY",10,163,""],["2026-09-25","COM-2026-0067","","RIBS",20,86,""],["2026-09-25","COM-2026-0067","","NACHOSCHIPS",20,145,""],["2026-09-25","COM-2026-0067","","PESTOSAUCE",3.5,335,""],["2026-09-25","ADJUSTMENTS","","PESTOSAUCE",2,335,""],["2026-09-25","ADJUSMENTS","","CHICKENKATSU",17,20,""],["2026-09-25","USED","","FRIES",0,100,""],["2026-09-25","USED","","NUGGETS",0,470,""],["2026-09-25","USED","","SAUSAGE",0,135,""],["2026-09-26","COM-2026-0068","Day one Clark","TTEOKBOKITOPPINGS",28,35,""],["2026-09-26","COM-2026-0068","","STRIPS",3.7,210,""],["2026-09-26","COM-2026-0068","","DOKINGMANGOJAM",2,310,""],["2026-09-26","COM-2026-0068","","DOKINGSTRAWBERRYJAM",2,310,""],["2026-09-27","COM-2026-0068","","RIBS",36,86,""],["2026-09-26","COM-2026-0068","","TSBLUEBERRYSY",3,220,""],["2026-09-26","COM-2026-0069","Day One Angeles","CHICKENKATSU",61,20,""],["2026-09-26","COM-2026-0069","","CHICKENWINGS",30,116,""],["2026-09-26","COM-2026-0069","","TSCOOKIEDOUGH",3,290,""]];
+// [date, receiptNo, customer, code, qty, unitCost, remarks]
+
+function loadState(){
+  try{
+    const s = localStorage.getItem(LS_KEY);
+    if(s) return JSON.parse(s);
+  }catch(e){}
+  return {
+    items: RAW_ITEMS.map(r=>({type:r[0],code:r[1],name:r[2],unit:r[3],min:r[4],price:r[5],stock:r[6]})),
+    addLog: RAW_ADDLOG.map((r,i)=>({id:i+1,date:r[0],code:r[1],qty:r[2],supplier:r[3],remarks:r[4]})),
+    deliveryLog: RAW_DELLOG.map((r,i)=>({id:i+1,date:r[0],receiptNo:r[1],customer:r[2],code:r[3],qty:r[4],unitCost:r[5],remarks:r[6]})),
+    priceLog: [],
+    receiptCounter: 70,
+    nextLogId: RAW_DELLOG.length + RAW_ADDLOG.length + 10
+  };
+}
+let state = loadState();
+function genId(){ state.nextLogId = (state.nextLogId||1)+1; return state.nextLogId; }
+function save(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){ console.error(e); } }
+
+function fmt(n){ n = Number(n)||0; return n.toLocaleString(undefined,{maximumFractionDigits:2}); }
+function money(n){ return '₱' + fmt(n); }
+function today(){ return new Date().toISOString().slice(0,10); }
+function status(it){
+  if(it.stock<=0) return 'OUT';
+  if(it.stock<=it.min) return 'LOW';
+  return 'OK';
+}
+function statusLabel(s){ return s==='OUT'?'OUT OF STOCK':s==='LOW'?'LOW STOCK':'OK'; }
+function itemByCode(c){ return state.items.find(i=>i.code===c); }
+
+const TABS = ['Dashboard','Inventory','Add Stock','Delivery Out','Price Log'];
+let active = 'Dashboard';
+let draftDelivery = { receiptNo:'', customer:'', date: today(), lines: [] };
+
+function renderNav(){
+  const nav = document.getElementById('tabs');
+  nav.innerHTML = TABS.map(t=>`<button class="${t===active?'active':''}" onclick="setTab('${t}')">${t}</button>`).join('');
+}
+function setTab(t){ active=t; render(); }
+
+function render(){
+  renderNav();
+  const app = document.getElementById('app');
+  if(active==='Dashboard') app.innerHTML = viewDashboard();
+  else if(active==='Inventory') app.innerHTML = viewInventory();
+  else if(active==='Add Stock') app.innerHTML = viewAddStock();
+  else if(active==='Delivery Out') app.innerHTML = viewDelivery();
+  else if(active==='Price Log') app.innerHTML = viewPriceLog();
+}
+
+// ---------- DASHBOARD ----------
+function viewDashboard(){
+  const items = state.items;
+  const totalItems = items.length;
+  const low = items.filter(i=>status(i)==='LOW').length;
+  const out = items.filter(i=>status(i)==='OUT').length;
+  const value = items.reduce((s,i)=>s+ (i.stock*i.price),0);
+  const recentAdds = state.addLog.slice(-5).reverse();
+  const recentOuts = state.deliveryLog.slice(-5).reverse();
+  return `
+  <div class="grid4">
+    <div class="kpi"><div class="n">${totalItems}</div><div class="l">Total Items</div></div>
+    <div class="kpi"><div class="n" style="color:var(--warn)">${low}</div><div class="l">Low Stock</div></div>
+    <div class="kpi"><div class="n" style="color:var(--bad)">${out}</div><div class="l">Out of Stock</div></div>
+    <div class="kpi"><div class="n">${money(value)}</div><div class="l">Stock Value</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><h2>Recent Stock In</h2>${recentAdds.length? tbl(['Date','Item','Qty','Supplier'], recentAdds.map(r=>[r.date,itemName(r.code),fmt(r.qty),r.supplier||'-'])):'<div class="empty">No entries yet.</div>'}</div>
+    <div class="card"><h2>Recent Deliveries</h2>${recentOuts.length? tbl(['Date','Receipt#','Item','Qty'], recentOuts.map(r=>[r.date,r.receiptNo,itemName(r.code),fmt(r.qty)])):'<div class="empty">No entries yet.</div>'}</div>
+  </div>
+  <div class="card"><h2>Items Needing Attention</h2>${lowOutTable()}</div>
+  `;
+}
+function itemName(code){ const it=itemByCode(code); return it? it.name : code; }
+function tbl(headers, rows){
+  return `<div class="tblwrap"><table><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+}
+function lowOutTable(){
+  const rows = state.items.filter(i=>status(i)!=='OK').sort((a,b)=>status(a)==='OUT'?-1:1);
+  if(!rows.length) return '<div class="empty">Everything is stocked fine 🎉</div>';
+  return tbl(['Code','Item','Stock','Min','Status'], rows.map(i=>[i.code,i.name,fmt(i.stock)+' '+i.unit,fmt(i.min),`<span class="pill ${status(i)}">${statusLabel(status(i))}</span>`]));
+}
+
+// ---------- INVENTORY ----------
+function viewInventory(){
+  return `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0">Master Inventory (${state.items.length} items)</h2>
+      <button class="btn" onclick="openNewItem()">+ New Item</button>
+    </div>
+    <input class="search" placeholder="Search item name or code..." oninput="filterInv(this.value)">
+    <div id="invTableWrap">${invTable(state.items)}</div>
+  </div>
+  <div id="itemFormCard"></div>
+  `;
+}
+function invTable(items){
+  return tbl(['Code','Item','Type','Unit','Stock','Min','Price','Status',''],
+    items.map(i=>[i.code,i.name,i.type,i.unit,fmt(i.stock),fmt(i.min),money(i.price),
+      `<span class="pill ${status(i)}">${statusLabel(status(i))}</span>`,
+      `<button class="btn secondary" onclick="openEditItem('${i.code}')">Edit</button>`]));
+}
+function filterInv(q){
+  q=q.toLowerCase();
+  const rows = state.items.filter(i=>i.name.toLowerCase().includes(q)||i.code.toLowerCase().includes(q));
+  document.getElementById('invTableWrap').innerHTML = invTable(rows);
+}
+function openNewItem(){
+  document.getElementById('itemFormCard').innerHTML = itemForm(null);
+}
+function openEditItem(code){
+  document.getElementById('itemFormCard').innerHTML = itemForm(itemByCode(code));
+}
+function itemForm(it){
+  return `<div class="card">
+    <h2>${it? 'Edit Item: '+it.name : 'New Item'}</h2>
+    <div class="grid2">
+      <div class="field"><label>Item Code</label><input id="f_code" value="${it?it.code:''}" ${it?'disabled':''}></div>
+      <div class="field"><label>Item Name</label><input id="f_name" value="${it?it.name:''}"></div>
+      <div class="field"><label>Type</label><input id="f_type" value="${it?it.type:'Market'}"></div>
+      <div class="field"><label>Unit</label><input id="f_unit" value="${it?it.unit:'pcs'}"></div>
+      <div class="field"><label>Minimum Stock Level</label><input id="f_min" type="number" step="any" value="${it?it.min:0}"></div>
+      <div class="field"><label>Selling Price</label><input id="f_price" type="number" step="any" value="${it?it.price:0}"></div>
+      ${it?`<div class="field"><label>Current Stock (manual correction)</label><input id="f_stock" type="number" step="any" value="${it.stock}"></div>`:''}
+    </div>
+    <div class="actionbar">
+      <button class="btn" onclick="saveItem(${it?`'${it.code}'`:'null'})">Save</button>
+      ${it?`<button class="btn danger" onclick="deleteItem('${it.code}')">Delete</button>`:''}
+      <button class="btn secondary" onclick="document.getElementById('itemFormCard').innerHTML=''">Cancel</button>
+    </div>
+  </div>`;
+}
+function saveItem(code){
+  const name=document.getElementById('f_name').value.trim();
+  const type=document.getElementById('f_type').value.trim()||'Market';
+  const unit=document.getElementById('f_unit').value.trim()||'pcs';
+  const min=parseFloat(document.getElementById('f_min').value)||0;
+  const price=parseFloat(document.getElementById('f_price').value)||0;
+  if(!name) return alert('Item name is required.');
+  if(code){
+    const it=itemByCode(code);
+    it.name=name; it.type=type; it.unit=unit; it.min=min;
+    if(price!==it.price){ state.priceLog.push({date:today(),code:it.code,price,notes:'Manual edit'}); it.price=price; }
+    const stockField=document.getElementById('f_stock');
+    if(stockField) it.stock=parseFloat(stockField.value)||0;
+  } else {
+    const newCode=document.getElementById('f_code').value.trim().toUpperCase();
+    if(!newCode) return alert('Item code is required.');
+    if(itemByCode(newCode)) return alert('That item code already exists.');
+    state.items.push({code:newCode,name,type,unit,min,price,stock:0});
+  }
+  save(); document.getElementById('itemFormCard').innerHTML=''; render();
+}
+function deleteItem(code){
+  if(!confirm('Delete this item? This cannot be undone.')) return;
+  state.items = state.items.filter(i=>i.code!==code);
+  save(); document.getElementById('itemFormCard').innerHTML=''; render();
+}
+
+// ---------- ADD STOCK ----------
+function viewAddStock(){
+  const log = state.addLog.slice().reverse();
+  return `
+  <div class="card">
+    <h2>Add Stock (Stock In)</h2>
+    <div class="grid2">
+      <div class="field"><label>Date</label><input id="as_date" type="date" value="${today()}"></div>
+      <div class="field"><label>Supplier</label><input id="as_supplier" placeholder="e.g. COMMISSARY"></div>
+      <div class="field"><label>Item</label>${itemSelect('as_item')}</div>
+      <div class="field"><label>Quantity</label><input id="as_qty" type="number" step="any" placeholder="0"></div>
+      <div class="field"><label>Remarks</label><input id="as_remarks" placeholder="optional"></div>
+    </div>
+    <button class="btn" onclick="submitAddStock()">Post to Stock</button>
+  </div>
+  <div class="card"><h2>Stock-In Log</h2>${log.length? tbl(['Date','Item Code','Item','Qty','Supplier','Remarks'], log.map(r=>[r.date,r.code,itemName(r.code),fmt(r.qty),r.supplier||'-',r.remarks||'-'])):'<div class="empty">No stock-in entries yet.</div>'}</div>
+  `;
+}
+function itemSelect(id){
+  return `<select id="${id}">${state.items.map(i=>`<option value="${i.code}">${i.code} — ${i.name}</option>`).join('')}</select>`;
+}
+function submitAddStock(){
+  const date=document.getElementById('as_date').value||today();
+  const supplier=document.getElementById('as_supplier').value.trim();
+  const code=document.getElementById('as_item').value;
+  const qty=parseFloat(document.getElementById('as_qty').value);
+  const remarks=document.getElementById('as_remarks').value.trim();
+  if(!qty||qty<=0) return alert('Enter a valid quantity.');
+  const it=itemByCode(code); it.stock+=qty;
+  state.addLog.push({date,code,qty,supplier,remarks});
+  save(); render();
+}
+
+// ---------- DELIVERY OUT ----------
+function nextReceiptNo(){
+  const yr=new Date().getFullYear();
+  const n = String(state.receiptCounter).padStart(4,'0');
+  return `COM-${yr}-${n}`;
+}
+function viewDelivery(){
+  if(!draftDelivery.receiptNo) draftDelivery.receiptNo = nextReceiptNo();
+  const log = state.deliveryLog.slice().reverse();
+  const receiptNos = [...new Set(state.deliveryLog.map(r=>r.receiptNo))].reverse();
+  return `
+  <div class="card">
+    <h2>New Delivery / Order (Stock Out)</h2>
+    <div class="grid2">
+      <div class="field"><label>Delivery Receipt No.</label><input id="dv_receipt" value="${draftDelivery.receiptNo}" oninput="draftDelivery.receiptNo=this.value"></div>
+      <div class="field"><label>Date</label><input id="dv_date" type="date" value="${draftDelivery.date}" oninput="draftDelivery.date=this.value"></div>
+      <div class="field"><label>Customer / Department</label><input id="dv_customer" value="${draftDelivery.customer}" oninput="draftDelivery.customer=this.value"></div>
+    </div>
+    <h2 style="font-size:14px">Add Line Item</h2>
+    <div class="rowline">
+      <div><label>Item</label>${itemSelect('dv_item')}</div>
+      <div><label>Qty</label><input id="dv_qty" type="number" step="any" placeholder="0"></div>
+      <div><label>Remarks</label><input id="dv_lremarks" placeholder="optional"></div>
+      <div><button class="btn secondary" onclick="addDeliveryLine()">+ Add Line</button></div>
+    </div>
+    ${draftDelivery.lines.length? `<div class="tblwrap"><table class="linetbl"><thead><tr><th>Item</th><th>Qty</th><th>Unit Cost</th><th>Total</th><th></th></tr></thead><tbody>
+      ${draftDelivery.lines.map((l,idx)=>`<tr><td>${itemName(l.code)}</td><td>${fmt(l.qty)}</td><td>${money(l.unitCost)}</td><td>${money(l.qty*l.unitCost)}</td><td><button class="btn danger" onclick="removeLine(${idx})">✕</button></td></tr>`).join('')}
+    </tbody></table></div>` : '<div class="empty">No line items added yet.</div>'}
+    <div class="actionbar">
+      <button class="btn" onclick="postDelivery()" ${draftDelivery.lines.length?'':'disabled'}>Post Delivery &amp; Print Receipt</button>
+      <button class="btn secondary" onclick="draftDelivery={receiptNo:nextReceiptNo(),customer:'',date:today(),lines:[]};render()">Clear</button>
+    </div>
+  </div>
+  <div class="card"><h2>Reprint or Delete a Receipt</h2>
+    <select id="reprintSel">${receiptNos.map(r=>`<option value="${r}">${r}</option>`).join('')}</select>
+    <div class="actionbar">
+      <button class="btn secondary" onclick="printReceipt(document.getElementById('reprintSel').value)">Print</button>
+      <button class="btn danger" onclick="deleteDeliveryReceipt(document.getElementById('reprintSel').value)">Delete Entire Receipt</button>
+    </div>
+  </div>
+  <div class="card"><h2>Delivery Log</h2>${log.length? tbl(['Date','Receipt#','Customer','Item','Qty','Unit Cost','Total',''], log.map(r=>[r.date,r.receiptNo,r.customer||'-',itemName(r.code),fmt(r.qty),money(r.unitCost),money(r.qty*r.unitCost),`<button class="btn danger" onclick="deleteDeliveryEntry(${r.id})">Delete</button>`])):'<div class="empty">No deliveries yet.</div>'}</div>
+  `;
+}
+function addDeliveryLine(){
+  const code=document.getElementById('dv_item').value;
+  const qty=parseFloat(document.getElementById('dv_qty').value);
+  const remarks=document.getElementById('dv_lremarks').value.trim();
+  if(!qty||qty<=0) return alert('Enter a valid quantity.');
+  const it=itemByCode(code);
+  draftDelivery.lines.push({code,qty,unitCost:it.price,remarks});
+  render();
+}
+function removeLine(idx){ draftDelivery.lines.splice(idx,1); render(); }
+function postDelivery(){
+  const {receiptNo,date,customer,lines}=draftDelivery;
+  lines.forEach(l=>{
+    const it=itemByCode(l.code); it.stock-=l.qty;
+    state.deliveryLog.push({id:genId(),date,receiptNo,customer,code:l.code,qty:l.qty,unitCost:l.unitCost,remarks:l.remarks});
+  });
+  state.receiptCounter++;
+  save();
+  const finishedReceipt = receiptNo;
+  draftDelivery = {receiptNo:nextReceiptNo(),customer:'',date:today(),lines:[]};
+  render();
+  printReceipt(finishedReceipt);
+}
+function deleteDeliveryEntry(id){
+  const entry = state.deliveryLog.find(r=>r.id===id);
+  if(!entry) return;
+  if(!confirm(`Delete this line — ${itemName(entry.code)} (${fmt(entry.qty)}) from ${entry.receiptNo}?\n\nThe quantity will be added back to stock.`)) return;
+  const it = itemByCode(entry.code);
+  if(it) it.stock += entry.qty;
+  state.deliveryLog = state.deliveryLog.filter(r=>r.id!==id);
+  save(); render();
+}
+function deleteDeliveryReceipt(receiptNo){
+  if(!receiptNo) return;
+  const entries = state.deliveryLog.filter(r=>r.receiptNo===receiptNo);
+  if(!entries.length) return alert('No records for that receipt number.');
+  if(!confirm(`Delete the ENTIRE receipt ${receiptNo}? (${entries.length} line item(s))\n\nAll quantities will be added back to stock.`)) return;
+  entries.forEach(entry=>{ const it=itemByCode(entry.code); if(it) it.stock += entry.qty; });
+  state.deliveryLog = state.deliveryLog.filter(r=>r.receiptNo!==receiptNo);
+  save(); render();
+}
+function printReceipt(receiptNo){
+  const lines = state.deliveryLog.filter(r=>r.receiptNo===receiptNo);
+  if(!lines.length) return alert('No records for that receipt number.');
+  const {date,customer}=lines[0];
+  const total = lines.reduce((s,l)=>s+l.qty*l.unitCost,0);
+  const copyHtml = (label)=>`
+    <div class="copy">
+      <div class="label">${label}</div>
+      <h2>COMMISSARY</h2><p>ORDER / DELIVERY RECEIPT</p>
+      <p>Receipt No: ${receiptNo}</p><p>Date: ${date}</p><p>Customer: ${customer||'-'}</p>
+      <table><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Cost</th><th class="r">Total</th></tr></thead><tbody>
+      ${lines.map(l=>`<tr><td>${itemName(l.code)}</td><td class="r">${fmt(l.qty)}</td><td class="r">${money(l.unitCost)}</td><td class="r">${money(l.qty*l.unitCost)}</td></tr>`).join('')}
+      </tbody></table>
+      <p style="text-align:right;font-weight:bold">TOTAL: ${money(total)}</p>
+      <p>&nbsp;</p><p>_____________________</p><p>Received By</p>
+    </div>`;
+  const win = window.open('', '_blank');
+  win.document.write(`<html><head><title>${receiptNo}</title><style>
+    @page{ size: A4 landscape; margin: 10mm; }
+    *{box-sizing:border-box}
+    body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:0}
+    .sheet{display:flex;width:100%;height:100%}
+    .copy{flex:1;padding:0 14px;border-right:1px dashed #999}
+    .copy:last-child{border-right:none}
+    .label{text-align:center;font-size:10px;letter-spacing:1px;color:#666;margin-bottom:4px}
+    h2,p{text-align:center;margin:2px 0}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px dashed #999;padding:3px;text-align:left;font-size:11px}
+    .r{text-align:right}
+  </style></head><body>
+  <div class="sheet">${copyHtml('CUSTOMER COPY')}${copyHtml('OFFICE COPY')}</div>
+  </body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+// ---------- PRICE LOG ----------
+function viewPriceLog(){
+  const log = state.priceLog.slice().reverse();
+  return `
+  <div class="card">
+    <h2>Update Price</h2>
+    <div class="grid2">
+      <div class="field"><label>Effective Date</label><input id="pu_date" type="date" value="${today()}"></div>
+      <div class="field"><label>Item</label>${itemSelect('pu_item')}</div>
+      <div class="field"><label>New Selling Price</label><input id="pu_price" type="number" step="any"></div>
+      <div class="field"><label>Notes</label><input id="pu_notes" placeholder="optional"></div>
+    </div>
+    <button class="btn" onclick="submitPriceUpdate()">Update Price</button>
+    <p class="tag">Updates the item's selling price immediately. Master Inventory reflects the latest price automatically — old prices stay in this log.</p>
+  </div>
+  <div class="card"><h2>Price Change History</h2>${log.length? tbl(['Date','Item Code','Item','New Price','Notes'], log.map(r=>[r.date,r.code,itemName(r.code),money(r.price),r.notes||'-'])):'<div class="empty">No price changes logged yet.</div>'}</div>
+  `;
+}
+function submitPriceUpdate(){
+  const date=document.getElementById('pu_date').value||today();
+  const code=document.getElementById('pu_item').value;
+  const price=parseFloat(document.getElementById('pu_price').value);
+  const notes=document.getElementById('pu_notes').value.trim();
+  if(isNaN(price)||price<0) return alert('Enter a valid price.');
+  itemByCode(code).price=price;
+  state.priceLog.push({date,code,price,notes});
+  save(); render();
+}
+
+render();
+</script>
+</body>
+</html>
